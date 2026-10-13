@@ -1,0 +1,54 @@
+# ============ 依赖目录 ============
+**/vendor/
+**/node_modules/
+
+# ============ 环境变量 & 密钥 ============
+**/.env
+**/.env.backup
+**/.env.local
+**/.env.production
+**/.env.staging
+
+# ============ 运行期数据 ============
+backend/database/database.sqlite
+backend/database/*.sqlite
+backend/storage/logs/*.log
+backend/storage/framework/cache/data/*
+backend/storage/framework/sessions/*
+backend/storage/framework/testing/*
+backend/storage/framework/views/*.php
+backend/storage/app/public/*
+!backend/storage/app/public/.gitignore
+backend/storage/*.key
+backend/bootstrap/cache/packages.php
+backend/bootstrap/cache/services.php
+
+# ============ 测试缓存 ============
+**/.phpunit.cache
+**/.phpunit.result.cache
+**/coverage/
+
+# ============ 前端构建产物 ============
+frontend/passenger/.next/
+frontend/passenger/out/
+frontend/passenger/build/
+frontend/passenger/node_modules/
+frontend/passenger/next-env.d.ts
+frontend/passenger/*.tsbuildinfo
+
+# ============ IDE & OS ============
+.idea/
+.vscode/
+.fleet/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# ============ Laravel 公共存储 ============
+backend/public/hot
+backend/public/storage
+backend/public/build
+
+# ============ Docker ============
+docker-compose.override.yml

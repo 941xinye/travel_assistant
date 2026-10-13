@@ -1,0 +1,9 @@
+{
+    "name": "travel-assistant/poc",
+    "description": "POC: AI + GEO travel assistant",
+    "type": "project",
+    "require": {
+        "guzzlehttp/guzzle": "^8.2",
+        "vlucas/phpdotenv": "^5.7"
+    }
+}

@@ -1,0 +1,132 @@
+# 全栈智能出行助手 — 本地开发 / 生产一致的容器编排
+# 对应 ARCHITECTURE.md 7.1（双进程模型：Octane HTTP :8080 与 原生 Swoole WS :8081 分离）
+# 消息管道采用 Redis Streams（ws-server lPush → Octane 侧 Job 消费），暂不引入 RabbitMQ
+
+services:
+  # ====== Octane HTTP Server（Laravel 全部业务逻辑）======
+  app:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: php artisan octane:start --host=0.0.0.0 --port=8080
+    ports:
+      - "8080:8080"
+    environment: &backend_env
+      APP_ENV: local
+      APP_DEBUG: "true"
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_DATABASE: travel_assistant
+      DB_USERNAME: root
+      DB_PASSWORD: root123
+      PG_HOST: postgis
+      PG_PORT: "5432"
+      PG_DATABASE: travel_geo
+      PG_USERNAME: postgres
+      PG_PASSWORD: postgres
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+    volumes:
+      - ./backend:/var/www/html
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      postgis:
+        condition: service_healthy
+
+  # ====== 司机位置消费进程（Redis Streams → MySQL/PostGIS 双写）======
+  queue:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: php artisan positions:consume
+    environment: *backend_env
+    volumes:
+      - ./backend:/var/www/html
+    depends_on:
+      redis:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      postgis:
+        condition: service_healthy
+
+  # ====== Swoole WS Server（独立原生 Swoole，无 Laravel，纯连接管理）======
+  ws:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: php bin/ws-server.php
+    ports:
+      - "8081:8081"
+    environment:
+      <<: *backend_env
+      WS_PORT: "8081"
+    volumes:
+      - ./backend:/var/www/html
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # ====== 乘客端 Web（Next.js 15）======
+  web-passenger:
+    build: ./frontend/passenger
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+
+  # ====== MySQL（事务数据：users/drivers/trips/orders）======
+  mysql:
+    image: mysql:8.0
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: travel_assistant
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_0900_ai_ci
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-proot123"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # ====== Redis（实时位置 / Pub/Sub / Streams / 缓存）======
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # ====== PostGIS 16 + pgvector（空间 / 向量数据独立库）======
+  postgis:
+    build:
+      context: ./docker/postgis
+      dockerfile: Dockerfile
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: travel_geo
+    volumes:
+      - postgis_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d travel_geo"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  mysql_data:
+  redis_data:
+  postgis_data:
